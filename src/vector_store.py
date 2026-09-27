@@ -19,8 +19,19 @@ def reset_collection():
 
 def add_chunks(chunks):
     collection = get_collection()
+    if not chunks:
+        return 0
     embeddings = embed_texts([chunk["text"] for chunk in chunks])
-    ids = [f"chunk-{i}" for i in range(len(chunks))]
+    existing = collection.get(include=[])
+    existing_ids = set(existing.get("ids", []))
+    ids = []
+    for i, chunk in enumerate(chunks):
+        import hashlib
+        base = f"{chunk['source']}::{chunk.get('page', 0)}::{i}::{chunk['text'][:80]}"
+        chunk_id = "chunk-" + hashlib.sha1(base.encode("utf-8")).hexdigest()
+        if chunk_id in existing_ids:
+            chunk_id = chunk_id + "-" + str(len(existing_ids) + i)
+        ids.append(chunk_id)
     metadatas = [
         {"source": chunk["source"], "page": chunk["page"] if chunk["page"] is not None else 0}
         for chunk in chunks
