@@ -21,3 +21,11 @@ def build_test_questions():
         "What actions or recommendations are given?",
         "What key facts should a decision maker know?",
     ]
+
+def answer_quality_label(retrieval):
+    coverage = retrieval.get("coverage", 0.0)
+    if coverage >= 0.75:
+        return "High retrieval support"
+    if coverage >= 0.45:
+        return "Moderate retrieval support"
+    return "Low retrieval support"
