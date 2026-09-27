@@ -7,11 +7,20 @@ from src.rag_pipeline import build_index, answer_question, clear_index
 load_dotenv()
 st.set_page_config(page_title="NexaRAG", page_icon="🧠", layout="wide")
 
+def get_setting(name):
+    value = os.getenv(name)
+    if value:
+        return value
+    try:
+        return st.secrets.get(name)
+    except Exception:
+        return None
+
 st.title("🧠 NexaRAG")
 st.caption("Universal AI Knowledge Assistant — ask questions about your own documents.")
 
-if not os.getenv("OPENAI_API_KEY"):
-    st.warning("Add your OPENAI_API_KEY to the .env file before asking questions.")
+if not get_setting("GEMINI_API_KEY"):
+    st.warning("Add your GEMINI_API_KEY in Streamlit Secrets before asking questions.")
 
 with st.sidebar:
     st.header("Knowledge Base")
