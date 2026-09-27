@@ -91,6 +91,16 @@ if mode == "Chat with Documents":
                             st.write(f"{item['source']} — page {item['page']} — semantic {item['score']} — hybrid {item.get('hybrid_score', item['score'])}")
                     st.session_state.messages.append({"role": "assistant", "content": answer})
                     st.caption(f"Retrieval coverage: {retrieval['coverage']}")
+
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("👍 Helpful", key=f"helpful_{len(st.session_state.messages)}"):
+                            st.session_state.setdefault("feedback", []).append({"question": question, "rating": "helpful"})
+                            st.success("Feedback recorded.")
+                    with c2:
+                        if st.button("👎 Needs improvement", key=f"improve_{len(st.session_state.messages)}"):
+                            st.session_state.setdefault("feedback", []).append({"question": question, "rating": "needs_improvement"})
+                            st.info("Feedback recorded for this session.")
                 except Exception as exc:
                     st.error(str(exc))
 else:
