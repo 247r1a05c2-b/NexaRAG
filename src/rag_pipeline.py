@@ -7,7 +7,6 @@ from src.vector_store import add_chunks, get_all_chunks, get_stats, reset_collec
 def build_index(documents):
     if not documents:
         raise ValueError("No readable text was found in the uploaded documents.")
-    reset_collection()
     chunks = chunk_documents(documents)
     if not chunks:
         raise ValueError("The uploaded files did not contain usable text.")
