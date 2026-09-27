@@ -1,4 +1,6 @@
 from src.chunking import chunk_documents
+from src.evaluation import retrieval_quality
+from src.hybrid_retrieval import combine_scores
 from src.llm import generate_answer, run_task
 from src.vector_store import add_chunks, get_all_chunks, get_stats, reset_collection, search
 
@@ -24,11 +26,12 @@ def format_context(results):
     return "\n\n".join(parts), sources
 
 def answer_question(question, history=None):
-    results = search(question, top_k=6)
+    results = combine_scores(search(question, top_k=8), question)[:6]
     if not results:
         raise ValueError("The knowledge base is empty. Process documents first.")
     context, sources = format_context(results)
-    return generate_answer(question, context, history), sources, results
+    answer = generate_answer(question, context, history)
+    return answer, sources, results, retrieval_quality(results)
 
 def run_document_task(task, limit=24):
     chunks = get_all_chunks(limit=limit)
