@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 from google import genai
 
@@ -22,9 +23,10 @@ def generate_answer(question, context):
         raise RuntimeError("GEMINI_API_KEY is missing from Streamlit Secrets.")
 
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=get_setting("GEMINI_MODEL") or "gemini-3.8-flash",
-        contents=f"""{SYSTEM_PROMPT}
+    primary = get_setting("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+    models = [primary, "gemini-3.5-flash-lite", "gemini-3.8-flash"]
+    models = list(dict.fromkeys(models))
+    prompt = f"""{SYSTEM_PROMPT}
 
 Context:
 {context}
@@ -32,6 +34,24 @@ Context:
 Question:
 {question}
 
-Answer only from the supplied context.""",
+Answer only from the supplied context."""
+
+    last_error = None
+
+    for model in models:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                )
+                return response.text
+            except Exception as exc:
+                last_error = exc
+                if "503" not in str(exc) and "UNAVAILABLE" not in str(exc):
+                    raise
+                time.sleep(2)
+
+    raise RuntimeError(
+        f"Gemini is temporarily unavailable. Please try again in a moment. Details: {last_error}"
     )
-    return response.text
