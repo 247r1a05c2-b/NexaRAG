@@ -2,7 +2,7 @@ from src.chunking import chunk_documents
 from src.evaluation import retrieval_quality
 from src.hybrid_retrieval import combine_scores
 from src.llm import generate_answer, run_task
-from src.vector_store import add_chunks, get_all_chunks, get_stats, reset_collection, search
+from src.vector_store import add_chunks, delete_source, get_all_chunks, get_documents, get_stats, reset_collection, search
 
 def build_index(documents):
     if not documents:
@@ -25,7 +25,7 @@ def format_context(results):
     return "\n\n".join(parts), sources
 
 def answer_question(question, history=None):
-    results = combine_scores(search(question, top_k=8), question)[:6]
+    results = combine_scores(search(question, top_k=10), question)[:7]
     if not results:
         raise ValueError("The knowledge base is empty. Process documents first.")
     context, sources = format_context(results)
@@ -38,6 +38,12 @@ def run_document_task(task, limit=24):
         raise ValueError("The knowledge base is empty. Process documents first.")
     context, sources = format_context(chunks)
     return run_task(task, context), sources
+
+def delete_document(source):
+    delete_source(source)
+
+def list_documents():
+    return get_documents()
 
 def clear_index():
     reset_collection()
