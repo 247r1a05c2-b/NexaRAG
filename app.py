@@ -31,7 +31,7 @@ with st.sidebar:
     st.header("📚 Knowledge Base")
     uploaded_files = st.file_uploader(
         "Upload PDF, DOCX, PPTX or TXT",
-        type=["pdf", "docx", "pptx", "txt"],
+        type=["pdf", "docx", "pptx", "txt", "png", "jpg", "jpeg"],
         accept_multiple_files=True,
     )
 
@@ -102,6 +102,7 @@ with st.sidebar:
     metrics = stats()
     st.metric("Documents", metrics["documents"])
     st.metric("Indexed chunks", metrics["chunks"])
+    st.metric("Session feedback", len(st.session_state.feedback))
 
 domain_prompts = {
     "Universal": "Answer using the supplied documents.",
