@@ -88,8 +88,9 @@ if mode == "Chat with Documents":
                     st.markdown(answer)
                     with st.expander("📖 Sources & Retrieval"):
                         for item in results:
-                            st.write(f"{item['source']} — page {item['page']} — relevance {item['score']}")
+                            st.write(f"{item['source']} — page {item['page']} — semantic {item['score']} — hybrid {item.get('hybrid_score', item['score'])}")
                     st.session_state.messages.append({"role": "assistant", "content": answer})
+                    st.caption(f"Retrieval coverage: {retrieval["coverage"]}")
                 except Exception as exc:
                     st.error(str(exc))
 else:
