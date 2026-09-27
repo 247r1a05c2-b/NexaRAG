@@ -33,7 +33,7 @@ def add_chunks(chunks):
     )
     return len(chunks)
 
-def search(query, top_k=6):
+def search(query, top_k=8):
     collection = get_collection()
     if collection.count() == 0:
         return []
