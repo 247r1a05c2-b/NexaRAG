@@ -4,7 +4,7 @@ NexaRAG is a beginner-friendly Retrieval-Augmented Generation (RAG) application 
 
 ## Architecture
 
-User Question → Query Embedding → Chroma Vector Database → Relevant Document Chunks → LLM → Grounded Answer + Sources
+User Question → Query Embedding → Chroma Vector Database → Relevant Document Chunks → Gemini LLM → Grounded Answer + Sources
 
 ## Features
 
@@ -14,7 +14,7 @@ User Question → Query Embedding → Chroma Vector Database → Relevant Docume
 - Local sentence-transformer embeddings
 - Chroma vector database
 - Semantic retrieval
-- LLM-based grounded answers
+- Gemini-based grounded answers
 - Source/page display
 - Streamlit interface
 
@@ -28,7 +28,9 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` and add your OpenAI API key, then run:
+Copy `.env.example` to `.env` and add your Gemini API key.
+
+Then run:
 
 ```bash
 streamlit run app.py
