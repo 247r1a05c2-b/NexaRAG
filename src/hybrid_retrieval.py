@@ -14,12 +14,29 @@ def lexical_score(query, document):
 
 def combine_scores(results, query):
     scored = []
-    for item in results:
+    for rank, item in enumerate(results):
         semantic = float(item.get("score", 0.0))
         lexical = lexical_score(query, item["text"])
+        rank_bonus = 1.0 / (rank + 1)
         item = dict(item)
-        item["semantic_score"] = semantic
+        item["semantic_score"] = round(semantic, 4)
         item["lexical_score"] = round(lexical, 4)
-        item["hybrid_score"] = round((0.75 * semantic) + (0.25 * lexical), 4)
+        item["rank_score"] = round(rank_bonus, 4)
+        item["hybrid_score"] = round((0.70 * semantic) + (0.20 * lexical) + (0.10 * rank_bonus), 4)
         scored.append(item)
-    return sorted(scored, key=lambda x: x["hybrid_score"], reverse=True)
+
+    scored.sort(key=lambda x: x["hybrid_score"], reverse=True)
+
+    selected = []
+    seen_sources = set()
+    for item in scored:
+        source = item.get("source", "Unknown")
+        if len(selected) < 3 or source not in seen_sources:
+            selected.append(item)
+            seen_sources.add(source)
+
+    for item in scored:
+        if item not in selected:
+            selected.append(item)
+
+    return selected
