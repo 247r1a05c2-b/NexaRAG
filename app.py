@@ -19,7 +19,7 @@ def get_setting(name):
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "indexed" not in st.session_state:
-    st.session_state.indexed = False
+    st.session_state.indexed = stats()["chunks"] > 0
 
 st.title("🧠 NexaRAG")
 st.caption("Hackathon-ready RAG workspace for documents, research and knowledge assistants.")
@@ -41,9 +41,9 @@ with st.sidebar:
                 for file in uploaded_files:
                     documents.extend(load_uploaded_file(file))
                 count = build_index(documents)
-            st.session_state.indexed = True
+            st.session_state.indexed = stats()["chunks"] > 0
             st.session_state.messages = []
-            st.success(f"Indexed {count} chunks from {len(uploaded_files)} file(s).")
+            st.success(f"Added {count} chunks from {len(uploaded_files)} file(s). Existing knowledge was preserved.")
 
     if st.button("🗑️ Clear Knowledge Base", use_container_width=True):
         clear_index()
@@ -84,13 +84,13 @@ if mode == "Chat with Documents":
             with st.spinner("Retrieving context and generating..."):
                 try:
                     history = st.session_state.messages[:-1]
-                    answer, sources, results = answer_question(question, history)
+                    answer, sources, results, retrieval = answer_question(question, history)
                     st.markdown(answer)
                     with st.expander("📖 Sources & Retrieval"):
                         for item in results:
                             st.write(f"{item['source']} — page {item['page']} — semantic {item['score']} — hybrid {item.get('hybrid_score', item['score'])}")
                     st.session_state.messages.append({"role": "assistant", "content": answer})
-                    st.caption(f"Retrieval coverage: {retrieval["coverage"]}")
+                    st.caption(f"Retrieval coverage: {retrieval['coverage']}")
                 except Exception as exc:
                     st.error(str(exc))
 else:
