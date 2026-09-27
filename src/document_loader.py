@@ -54,6 +54,11 @@ def load_uploaded_file(uploaded_file):
                 documents.append({"text": text, "source": name, "page": slide_number, "method": "text"})
         return documents
 
+    if suffix in {".png", ".jpg", ".jpeg"}:
+        image = Image.open(io.BytesIO(data)).convert("RGB")
+        text = pytesseract.image_to_string(image)
+        return [{"text": text, "source": name, "page": None, "method": "ocr"}] if text.strip() else []
+
     if suffix == ".txt":
         text = data.decode("utf-8", errors="ignore")
         return [{"text": text, "source": name, "page": None, "method": "text"}] if text.strip() else []
