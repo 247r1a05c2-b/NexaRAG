@@ -17,6 +17,7 @@ def test_scan_downgrades_low_confidence_auto_repair(monkeypatch):
         {"id": "b", "source": "new.pdf", "page": 1, "text": "Policy says B", "status": "active"},
     ]
     monkeypatch.setattr(sh, "get_all_chunks", lambda limit=None: chunks)
+    monkeypatch.setattr(sh, "search", lambda text, top_k=6: [{"id": "b" if text.endswith("A") else "a", "score": 0.9}])
     monkeypatch.setattr(sh, "generate_text", lambda prompt: json.dumps({"issues": [{"type": "conflict", "chunk_ids": ["a", "b"], "preferred_chunk_id": "b", "confidence": 0.82, "reason": "Newer source conflicts with older source", "repair": "quarantine_old"}]}))
     monkeypatch.setattr(sh, "record_event", lambda *args, **kwargs: None)
     report = sh.scan_knowledge_base()
