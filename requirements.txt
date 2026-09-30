@@ -9,3 +9,7 @@ pytesseract
 Pillow
 sentence-transformers
 chromadb
+fastapi
+uvicorn[standard]
+pytest
+httpx
