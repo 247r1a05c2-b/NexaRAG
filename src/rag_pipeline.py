@@ -1,4 +1,4 @@
-from src.audit_log import record_event
+from src.audit_log import list_events, record_event
 from src.chunking import chunk_documents
 from src.evaluation import retrieval_quality
 from src.hybrid_retrieval import combine_scores
@@ -76,3 +76,7 @@ def heal_knowledge_health(report, approved_issue_indexes=None):
 
 def restore_knowledge_chunk(chunk_id):
     return restore_chunk(chunk_id)
+
+
+def audit_history(limit=30):
+    return list_events(limit=limit)
