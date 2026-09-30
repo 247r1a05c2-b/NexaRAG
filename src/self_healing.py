@@ -5,12 +5,13 @@ from typing import Any
 
 from src.audit_log import record_event
 from src.llm import generate_text
-from src.vector_store import get_all_chunks, set_chunk_status
+from src.vector_store import get_all_chunks, search, set_chunk_status
 
 MIN_AUTO_HEAL_CONFIDENCE = 0.90
 MIN_REVIEW_CONFIDENCE = 0.75
 MAX_CHUNKS_PER_SCAN = 40
 MAX_CHUNK_CHARS = 5000
+CANDIDATE_SIMILARITY = 0.55
 
 
 def utc_now():
@@ -106,20 +107,43 @@ KNOWLEDGE EVIDENCE:
 """ + "\n\n".join(evidence)
 
 
+def _candidate_pairs(chunks):
+    by_id = {chunk["id"]: chunk for chunk in chunks}
+    pairs = {}
+    for chunk in chunks:
+        try:
+            neighbours = search(chunk["text"], top_k=6)
+        except Exception:
+            neighbours = []
+        for neighbour in neighbours:
+            other_id = neighbour.get("id")
+            if not other_id or other_id == chunk["id"] or other_id not in by_id:
+                continue
+            if neighbour.get("score", 0) < CANDIDATE_SIMILARITY:
+                continue
+            key = tuple(sorted((chunk["id"], other_id)))
+            pairs[key] = [by_id[key[0]], by_id[key[1]]]
+    return list(pairs.values())
+
+
 def scan_knowledge_base(limit: int | None = None, batch_size: int = MAX_CHUNKS_PER_SCAN):
     chunks = get_all_chunks(limit=limit)
     chunks = [c for c in chunks if c.get("status", "active") == "active"]
     if not chunks:
-        report = {"status": "empty", "health_score": 0, "issues": [], "checked_chunks": 0, "checked_at": utc_now()}
+        report = {"status": "empty", "health_score": 0, "issues": [], "checked_chunks": 0, "checked_pairs": 0, "checked_at": utc_now()}
         record_event("health_scan", report)
         return report
 
+    candidates = _candidate_pairs(chunks)
+    if not candidates:
+        candidates = [[chunk] for chunk in chunks]
     all_issues = []
     seen = set()
     valid_ids = {chunk["id"] for chunk in chunks}
-    for start in range(0, len(chunks), batch_size):
-        batch = chunks[start:start + batch_size]
-        raw = generate_text(_build_prompt(batch))
+    for start in range(0, len(candidates), batch_size):
+        batch = [chunk for pair in candidates[start:start + batch_size] for chunk in pair]
+        unique_batch = {chunk["id"]: chunk for chunk in batch}
+        raw = generate_text(_build_prompt(list(unique_batch.values())))
         parsed = _extract_json(raw)
         for raw_issue in parsed.get("issues", []):
             issue = _sanitize_issue(raw_issue, valid_ids)
@@ -141,11 +165,12 @@ def scan_knowledge_base(limit: int | None = None, batch_size: int = MAX_CHUNKS_P
         "health_score": health_score,
         "issues": all_issues,
         "checked_chunks": len(chunks),
+        "checked_pairs": len(candidates),
         "auto_healable": auto_count,
         "human_review": review_count,
         "checked_at": utc_now(),
     }
-    record_event("health_scan", {"health_score": health_score, "checked_chunks": len(chunks), "issues": all_issues})
+    record_event("health_scan", {"health_score": health_score, "checked_chunks": len(chunks), "checked_pairs": len(candidates), "issues": all_issues})
     return report
 
 
@@ -166,13 +191,7 @@ def heal_knowledge_base(report: dict[str, Any], approved_issue_indexes: list[int
         for chunk_id in issue.get("chunk_ids", []):
             if chunk_id == preferred:
                 continue
-            changed = set_chunk_status(
-                chunk_id,
-                "quarantined",
-                healing_reason=issue.get("reason", "Superseded conflicting evidence"),
-                healed_at=utc_now(),
-                preferred_chunk_id=preferred,
-            )
+            changed = set_chunk_status(chunk_id, "quarantined", healing_reason=issue.get("reason", "Superseded conflicting evidence"), healed_at=utc_now(), preferred_chunk_id=preferred)
             if changed:
                 repaired.append({"chunk_id": chunk_id, "kept_chunk_id": preferred, "reason": issue.get("reason", "Superseded conflicting evidence")})
         record_event("heal", {"issue": issue, "human_approved": human_approved})
