@@ -14,4 +14,4 @@ jobs:
           python-version: '3.11'
       - run: pip install fastapi uvicorn pytest httpx pydantic
       - run: python -m compileall backend tests
-      - run: pytest -q
+      - run: PYTHONPATH=. pytest -q
