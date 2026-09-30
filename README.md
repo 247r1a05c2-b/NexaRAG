@@ -1,181 +1,128 @@
-# 🧠 NexaRAG — Self-Healing Adaptive RAG Platform
+# 🚨 NexaRAG Command — Multi-Agent Incident Commander
 
-NexaRAG is a reusable Retrieval-Augmented Generation platform for turning uploaded knowledge into grounded AI assistants. It now includes a **Self-Healing Knowledge Base** that continuously checks indexed evidence for contradictions, duplicates and weak evidence, then safely quarantines superseded conflicting chunks so normal retrieval stays clean while the original evidence remains preserved.
+**NRCM PNG2 · Generative AI & LLM Applications**
 
-## What it can do
-- PDF, scanned PDF, DOCX, PPTX and TXT ingestion
-- OCR fallback for scanned PDF pages
-- Table extraction from DOCX/PPTX
-- Overlapping document chunking
-- Local sentence-transformer embeddings
-- Chroma vector database
-- Incremental indexing that preserves existing knowledge
-- Duplicate chunk protection
-- Hybrid semantic + lexical + rank retrieval
-- Source diversity during retrieval
-- Gemini grounded generation
-- Conversational document chat
-- Source and page traceability
-- Retrieval coverage indicator
-- Summarization, question generation, key insights and multi-document comparison
-- Document list and individual document removal
-- Domain modes for different hackathon themes
-- Session-level user feedback
-- **Knowledge Integrity Agent** for contradiction, duplicate and weak-evidence detection
-- **Knowledge Health Score** for the indexed knowledge base
-- **Safe self-healing** by quarantining superseded evidence instead of silently deleting it
-- Streamlit deployment
+NexaRAG Command is a production-safe, multi-agent incident response system that ingests noisy operational signals, correlates evidence, ranks probable root causes, builds an auditable incident timeline, and proposes safe diagnostic steps for human engineers.
 
-## Self-Healing Knowledge Base
+## Problem
+During outages, engineers face fragmented logs, alerts, tickets, deployment history and chat messages. NexaRAG Command turns these streams into one evidence-backed incident view without allowing an LLM to execute unsafe production actions.
 
-The self-healing layer adds an integrity loop around the normal RAG pipeline:
+## Core agents
 
-```text
-Documents
-   ↓
-Extraction → Chunking → Embeddings → Chroma
-                                      ↓
-                           Knowledge Integrity Agent
-                                      ↓
-                    ┌─────────────────┴─────────────────┐
-                    ↓                                   ↓
-             Healthy evidence                    Integrity issue
-                    ↓                                   ↓
-              Normal RAG                     Confidence + evidence check
-                                                        ↓
-                                             Safe repair when justified
-                                                        ↓
-                                  Quarantine superseded conflicting chunks
-                                                        ↓
-                                    Clean retrieval + preserved history
-```
-
-### Integrity checks
-
-The Knowledge Integrity Agent checks for:
-1. Direct factual contradictions between indexed chunks.
-2. A newer chunk that clearly supersedes an older conflicting chunk.
-3. Duplicate or near-duplicate claims that may create retrieval ambiguity.
-4. Weak or incomplete evidence that should not be trusted automatically.
-
-The agent returns structured findings with a confidence threshold. Only high-confidence findings are considered for automatic repair.
-
-### Safe healing
-
-NexaRAG does **not** silently delete evidence. When the agent is sufficiently confident that an older chunk has been superseded, the older chunk is marked `quarantined` with the reason and timestamp. Quarantined evidence is excluded from normal retrieval but remains available in the Chroma store for auditability and review.
-
-This gives the hackathon demo a clear **detect → reason → repair → verify** loop.
+| Agent | Responsibility |
+|---|---|
+| Ingestion Agent | Normalizes heterogeneous incident events |
+| Correlation Agent | Links signals by service and failure pattern |
+| Root Cause Agent | Ranks probable failure causes with confidence |
+| Safety & Guardrail Agent | Generates read-only diagnostic proposals and blocks unsafe actions |
+| Timeline Agent | Builds a chronological, auditable incident timeline |
+| Commander | Orchestrates the agents and produces the incident brief |
+| Optional Gemini Copilot | Converts evidence into a concise executive summary |
 
 ## Architecture
 
 ```text
-Upload
-  ↓
-PDF/DOCX/PPTX/TXT + OCR
-  ↓
-Chunking
-  ↓
-Sentence-Transformer Embeddings
-  ↓
-Chroma Vector Store
-  ↓
-Knowledge Integrity Agent
-  ├── contradiction detection
-  ├── duplicate detection
-  ├── weak-evidence detection
-  └── confidence scoring
-  ↓
-Safe Healing / Quarantine
-  ↓
-Hybrid Retrieval
-  ↓
-Grounded Context
-  ↓
-Gemini
-  ↓
-Answer + Sources + Retrieval Metrics
+Logs ───────┐
+Alerts ─────┤
+Tickets ────┤
+Deployments ┼──> Ingestion ─> Correlation ─> Root Cause ─> Safety Guardrail
+Chat ───────┤                                      │             │
+Metrics ────┘                                      └──────┬──────┘
+                                                        ↓
+                                             Timeline + Commander UI
+                                                        ↓
+                                                Human verification
 ```
 
-## Supported domains
-- Education → syllabus, notes and regulation assistant
-- Healthcare → document-grounded medical information assistant
-- Legal → contract and policy assistant
-- Recruitment → resume and job-description intelligence
-- Finance → report and policy analyst
-- Enterprise → internal knowledge assistant
-- Research → paper analysis assistant
-- Universal → general knowledge workspace
+## Safety model
+The commander is **advisory by design**. It does not execute shell, Kubernetes, cloud, database mutation, rollback or destructive commands. Diagnostic proposals are read-only and require human verification. Dangerous command patterns are explicitly blocked and covered by tests.
 
-## Tech stack
-- Python
-- Streamlit
-- Gemini API
-- ChromaDB
-- Sentence Transformers
-- PyPDF
-- PyMuPDF
-- Tesseract OCR
-- python-docx
-- python-pptx
+## Features
+- Multi-agent incident analysis
+- Logs, alerts, tickets, deployments, chat and metrics ingestion
+- Evidence correlation across services
+- Ranked root-cause hypotheses
+- Confidence scoring
+- Safe diagnostic proposals
+- Human-in-the-loop approval state
+- Auditable chronological timeline
+- Production-safe guardrails
+- Optional Gemini LLM executive summary
+- Built-in realistic outage demo
+- Responsive frontend dashboard
+- FastAPI backend
+- Docker deployment
+- Automated GitHub Actions CI
+- Deterministic fallback mode when no API key is available
+- Full unit/API test suite
 
-## Setup
-Install the Python requirements and run the Streamlit app with `streamlit run app.py`.
+## Demo
+Click **Load Demo Incident**. The system creates a checkout degradation where a deployment is followed by database connection timeouts, elevated p95 latency and 5xx alerts.
 
-For Streamlit Cloud, add these secrets:
+Expected flow:
 
-```toml
-GEMINI_API_KEY = "your_key"
-GEMINI_MODEL = "gemini-3.8-flash"
+```text
+Incident
+   ↓
+6 heterogeneous events
+   ↓
+5 agents collaborate
+   ↓
+Deployment regression ranked with high confidence
+   ↓
+Read-only diagnostic proposals
+   ↓
+Human verification required
+   ↓
+Auditable timeline
 ```
 
-Never commit the API key to GitHub.
+## Run locally
 
-## RAG flow
-1. Upload a document.
-2. Extract text; use OCR when a PDF page has no extractable text.
-3. Split text into overlapping chunks.
-4. Convert chunks into embeddings.
-5. Store chunks and metadata in Chroma.
-6. Run the Knowledge Integrity Agent when requested.
-7. Quarantine only high-confidence superseded evidence.
-8. Convert the user query into an embedding.
-9. Retrieve active candidate chunks.
-10. Combine semantic similarity, lexical overlap and retrieval rank.
-11. Send the strongest context to Gemini.
-12. Generate a grounded answer.
-13. Show source, page and retrieval-quality information.
+```bash
+python -m venv .venv
+# Windows
+.venv\\Scripts\\activate
+# Linux/macOS
+# source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn backend.main:app --reload --port 8000
+```
 
-## Hackathon demo flow
-1. Upload an older policy or knowledge document.
-2. Upload a newer document containing an intentional correction.
-3. Click **Scan Knowledge Health**.
-4. Show the detected contradiction and confidence.
-5. Click **Heal Knowledge Base**.
-6. Show that the superseded chunk is quarantined rather than deleted.
-7. Ask a question whose answer changed in the newer document.
-8. Show that retrieval uses the active evidence and cites the correct source.
-9. Open the document list and show the quarantined chunk count.
-10. Explain the loop as **Detect → Verify → Heal → Retrieve → Learn**.
+Open **http://localhost:8000**.
 
-## Judge explanation
-Traditional RAG can keep accumulating contradictory evidence as new documents are added. NexaRAG adds a knowledge-integrity layer that checks the indexed evidence and prevents high-confidence superseded chunks from contaminating normal retrieval.
+Optional Gemini:
 
-The system is intentionally conservative: uncertain conflicts are sent to review instead of being automatically changed. This makes the healing process auditable and reduces the risk of the LLM silently rewriting the knowledge base.
+```text
+GEMINI_API_KEY=your_key
+GEMINI_MODEL=gemini-2.5-flash
+```
 
-## Important persistence note
-The Chroma database is stored in the app's local filesystem. Incremental indexing and quarantine work while that app instance retains its data, but Streamlit Cloud local storage should not be treated as permanent cloud persistence across rebuilds or infrastructure replacement.
+The project works without Gemini using deterministic analysis, which keeps demos and tests reproducible.
 
-For production, connect Chroma or another vector database to managed cloud storage and persist uploaded documents there.
+## Tests
 
-## Future production upgrades
-- Managed cloud vector database
-- Persistent object storage
-- Scheduled background health scans
-- External source verification and web connectors
-- Human approval workflow for medium-confidence repairs
-- Cross-encoder reranking
-- Multimodal image/table understanding
-- Long-term feedback analytics
-- Automated evaluation datasets
-- Agentic tools and external connectors
-- Role-based access control
+```bash
+python -m compileall backend tests
+pytest -q
+```
+
+Tests cover:
+- Event correlation
+- Root-cause diagnosis
+- Safety gating
+- Dangerous-command blocking
+- End-to-end demo API flow
+- Unknown incident handling
+
+## Deployment
+
+```bash
+docker build -t nexarag-command .
+docker run -p 8000:8000 nexarag-command
+```
+
+Kubernetes manifests can be added on top of the container for production scaling and monitoring.
+
+## Existing NexaRAG work
+The original document RAG/knowledge-base implementation remains in the repository as reusable infrastructure. The PNG2 commander is the new primary hackathon application and can later connect to that RAG layer for runbook retrieval and historical incident knowledge.
