@@ -1,6 +1,8 @@
 import hashlib
 from datetime import datetime, timezone
+
 import chromadb
+
 from src.embeddings import embed_texts
 
 DB_PATH = "data/chroma"
@@ -22,6 +24,15 @@ def reset_collection():
         pass
 
 
+def _chunk_id(chunk):
+    base = f"{chunk['source']}::{chunk.get('page', 0)}::{chunk['text']}"
+    return "chunk-" + hashlib.sha1(base.encode("utf-8")).hexdigest()
+
+
+def _content_sha(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def add_chunks(chunks):
     collection = get_collection()
     if not chunks:
@@ -31,8 +42,7 @@ def add_chunks(chunks):
     new_chunks = []
     ids = []
     for chunk in chunks:
-        base = f"{chunk['source']}::{chunk.get('page', 0)}::{chunk['text']}"
-        chunk_id = "chunk-" + hashlib.sha1(base.encode("utf-8")).hexdigest()
+        chunk_id = _chunk_id(chunk)
         if chunk_id in existing_ids:
             continue
         new_chunks.append(chunk)
@@ -41,16 +51,22 @@ def add_chunks(chunks):
         return 0
     embeddings = embed_texts([chunk["text"] for chunk in new_chunks])
     now = datetime.now(timezone.utc).isoformat()
-    metadatas = [
-        {
-            "source": chunk["source"],
-            "page": chunk["page"] if chunk["page"] is not None else 0,
-            "method": chunk.get("method", "text"),
-            "added_at": now,
-            "status": "active",
-        }
-        for chunk in new_chunks
-    ]
+    metadatas = []
+    for chunk in new_chunks:
+        text = chunk["text"]
+        metadatas.append(
+            {
+                "source": chunk["source"],
+                "page": chunk["page"] if chunk["page"] is not None else 0,
+                "method": chunk.get("method", "text"),
+                "added_at": now,
+                "ingested_at": now,
+                "status": "active",
+                "version": "1",
+                "content_sha": _content_sha(text),
+                "source_lineage": f"{chunk['source']}#page={chunk.get('page', 0)}",
+            }
+        )
     collection.add(
         ids=ids,
         documents=[chunk["text"] for chunk in new_chunks],
@@ -66,34 +82,43 @@ def search(query, top_k=10):
         return []
     results = collection.query(
         query_embeddings=[embed_texts([query])[0]],
-        n_results=min(max(top_k * 2, top_k), collection.count()),
+        n_results=min(max(top_k * 3, top_k), collection.count()),
         include=["documents", "metadatas", "distances"],
     )
     items = []
     for i, document in enumerate(results["documents"][0]):
         metadata = results["metadatas"][0][i]
-        if metadata.get("status", "active") == "quarantined":
+        if metadata.get("status", "active") != "active":
             continue
         distance = results["distances"][0][i]
-        items.append({
-            "text": document,
-            "source": metadata.get("source", "Unknown"),
-            "page": metadata.get("page", 0),
-            "method": metadata.get("method", "text"),
-            "added_at": metadata.get("added_at", ""),
-            "status": metadata.get("status", "active"),
-            "score": round(max(0.0, 1.0 - float(distance)), 4),
-        })
+        items.append(
+            {
+                "id": results["ids"][0][i],
+                "text": document,
+                "source": metadata.get("source", "Unknown"),
+                "page": metadata.get("page", 0),
+                "method": metadata.get("method", "text"),
+                "added_at": metadata.get("added_at", ""),
+                "status": metadata.get("status", "active"),
+                "version": metadata.get("version", "1"),
+                "content_sha": metadata.get("content_sha", ""),
+                "source_lineage": metadata.get("source_lineage", ""),
+                "score": round(max(0.0, 1.0 - float(distance)), 4),
+            }
+        )
         if len(items) >= top_k:
             break
     return items
 
 
-def get_all_chunks(limit=40):
+def get_all_chunks(limit=None):
     collection = get_collection()
     if collection.count() == 0:
         return []
-    result = collection.get(limit=min(limit, collection.count()), include=["documents", "metadatas"])
+    kwargs = {"include": ["documents", "metadatas"]}
+    if limit is not None:
+        kwargs["limit"] = min(limit, collection.count())
+    result = collection.get(**kwargs)
     return [
         {
             "id": result["ids"][i],
@@ -102,7 +127,12 @@ def get_all_chunks(limit=40):
             "page": result["metadatas"][i].get("page", 0),
             "method": result["metadatas"][i].get("method", "text"),
             "added_at": result["metadatas"][i].get("added_at", ""),
+            "ingested_at": result["metadatas"][i].get("ingested_at", ""),
             "status": result["metadatas"][i].get("status", "active"),
+            "version": result["metadatas"][i].get("version", "1"),
+            "content_sha": result["metadatas"][i].get("content_sha", ""),
+            "source_lineage": result["metadatas"][i].get("source_lineage", ""),
+            "healing_reason": result["metadatas"][i].get("healing_reason", ""),
         }
         for i in range(len(result["documents"]))
     ]
@@ -120,6 +150,10 @@ def set_chunk_status(chunk_id, status, **extra_metadata):
     return True
 
 
+def restore_chunk(chunk_id):
+    return set_chunk_status(chunk_id, "active", restored_at=datetime.now(timezone.utc).isoformat())
+
+
 def get_documents():
     collection = get_collection()
     if collection.count() == 0:
@@ -128,10 +162,16 @@ def get_documents():
     docs = {}
     for metadata in result["metadatas"]:
         source = metadata.get("source", "Unknown")
-        entry = docs.setdefault(source, {"source": source, "chunks": 0, "pages": set(), "methods": set(), "added_at": metadata.get("added_at", ""), "quarantined": 0})
+        entry = docs.setdefault(
+            source,
+            {"source": source, "chunks": 0, "pages": set(), "methods": set(), "added_at": metadata.get("added_at", ""), "quarantined": 0, "review": 0},
+        )
         entry["chunks"] += 1
-        if metadata.get("status") == "quarantined":
+        status = metadata.get("status", "active")
+        if status == "quarantined":
             entry["quarantined"] += 1
+        if status == "review":
+            entry["review"] += 1
         page = metadata.get("page", 0)
         if page:
             entry["pages"].add(page)
@@ -144,18 +184,25 @@ def get_documents():
             "methods": ", ".join(sorted(value["methods"])),
             "added_at": value["added_at"],
             "quarantined": value["quarantined"],
+            "review": value["review"],
         }
         for value in docs.values()
     ]
 
 
 def delete_source(source):
-    collection = get_collection()
-    collection.delete(where={"source": source})
+    get_collection().delete(where={"source": source})
 
 
 def get_stats():
     collection = get_collection()
     docs = get_documents()
     quarantined = sum(item["quarantined"] for item in docs)
-    return {"chunks": collection.count() - quarantined, "documents": len(docs), "quarantined": quarantined}
+    review = sum(item["review"] for item in docs)
+    return {
+        "chunks": collection.count() - quarantined - review,
+        "documents": len(docs),
+        "quarantined": quarantined,
+        "review": review,
+        "total_chunks": collection.count(),
+    }
