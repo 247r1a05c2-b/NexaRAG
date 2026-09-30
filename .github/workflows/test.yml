@@ -8,18 +8,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y tesseract-ocr libgl1 libglib2.0-0
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt pytest
+      - name: Install test dependency
+        run: pip install pytest
       - name: Compile Python files
         run: python -m compileall -q .
       - name: Run unit tests
