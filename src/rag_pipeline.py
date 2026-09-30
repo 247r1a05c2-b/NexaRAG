@@ -2,7 +2,9 @@ from src.chunking import chunk_documents
 from src.evaluation import retrieval_quality
 from src.hybrid_retrieval import combine_scores
 from src.llm import generate_answer, run_task
+from src.self_healing import scan_knowledge_base, heal_knowledge_base
 from src.vector_store import add_chunks, delete_source, get_all_chunks, get_documents, get_stats, reset_collection, search
+
 
 def build_index(documents):
     if not documents:
@@ -11,6 +13,7 @@ def build_index(documents):
     if not chunks:
         raise ValueError("The uploaded files did not contain usable text.")
     return add_chunks(chunks)
+
 
 def format_context(results):
     parts = []
@@ -24,6 +27,7 @@ def format_context(results):
             sources.append(location)
     return "\n\n".join(parts), sources
 
+
 def answer_question(question, history=None):
     results = combine_scores(search(question, top_k=10), question)[:7]
     if not results:
@@ -32,21 +36,35 @@ def answer_question(question, history=None):
     answer = generate_answer(question, context, history)
     return answer, sources, results, retrieval_quality(results)
 
+
 def run_document_task(task, limit=24):
     chunks = get_all_chunks(limit=limit)
+    chunks = [chunk for chunk in chunks if chunk.get("status", "active") != "quarantined"]
     if not chunks:
         raise ValueError("The knowledge base is empty. Process documents first.")
     context, sources = format_context(chunks)
     return run_task(task, context), sources
 
+
 def delete_document(source):
     delete_source(source)
+
 
 def list_documents():
     return get_documents()
 
+
 def clear_index():
     reset_collection()
 
+
 def stats():
     return get_stats()
+
+
+def scan_knowledge_health(limit=60):
+    return scan_knowledge_base(limit=limit)
+
+
+def heal_knowledge_health(report):
+    return heal_knowledge_base(report)
