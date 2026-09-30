@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NexaRAG Incident Commander</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div><div class="brand">NexaRAG <span>COMMAND</span></div><div class="sub">Multi-Agent Incident Commander</div></div>
+    <div class="status"><i></i> Production-safe mode</div>
+  </header>
+  <main class="grid">
+    <aside class="sidebar">
+      <button class="primary" id="demoBtn">⚡ Load Demo Incident</button>
+      <button class="secondary" id="newBtn">＋ New Incident</button>
+      <div class="side-title">INCIDENTS</div>
+      <div id="incidentList" class="incident-list"></div>
+      <div class="side-title">AGENTS</div>
+      <div class="agents">
+        <div>◉ Ingestion Agent <b>READY</b></div><div>◉ Correlation Agent <b>READY</b></div><div>◉ Root Cause Agent <b>READY</b></div><div>◉ Safety Guardrail <b>LOCKED</b></div><div>◉ Timeline Agent <b>READY</b></div>
+      </div>
+    </aside>
+    <section class="workspace">
+      <div id="empty" class="empty"><div class="orb">✦</div><h1>Incident Command Center</h1><p>Create an incident or load the demo to see multi-agent diagnosis, an auditable timeline and safe remediation proposals.</p></div>
+      <div id="incidentView" class="hidden">
+        <div class="hero"><div><div class="eyebrow" id="incidentId"></div><h1 id="title"></h1><p id="description"></p></div><button class="analyze" id="analyzeBtn">Run Multi-Agent Analysis</button></div>
+        <div class="cards"><div class="card"><span>STATUS</span><strong id="status">OPEN</strong></div><div class="card"><span>EVENTS</span><strong id="eventCount">0</strong></div><div class="card"><span>TOP CONFIDENCE</span><strong id="confidence">—</strong></div><div class="card"><span>PROPOSALS</span><strong id="proposalCount">0</strong></div></div>
+        <div class="panel summary"><div class="panel-head"><h2>Commander Brief</h2><span>LLM + deterministic safety</span></div><p id="summary">Run analysis to generate an evidence-backed brief.</p></div>
+        <div class="two">
+          <div class="panel"><div class="panel-head"><h2>Root Cause Hypotheses</h2><span>Ranked by evidence</span></div><div id="hypotheses"></div></div>
+          <div class="panel"><div class="panel-head"><h2>Safe Diagnostic Proposals</h2><span>Human verification required</span></div><div id="proposals"></div></div>
+        </div>
+        <div class="panel"><div class="panel-head"><h2>Auditable Incident Timeline</h2><span id="timelineCount"></span></div><div id="timeline" class="timeline"></div></div>
+        <div class="panel"><div class="panel-head"><h2>Ingest Event</h2><span>log · alert · ticket · deployment · chat · metric</span></div>
+          <form id="eventForm" class="event-form"><select id="source"><option>log</option><option>alert</option><option>ticket</option><option>deployment</option><option>chat</option><option>metric</option></select><input id="service" placeholder="service" value="checkout"><input id="message" placeholder="Event message" required><select id="severity"><option>info</option><option>warning</option><option>error</option><option>high</option><option>critical</option></select><button>Add event</button></form>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
