@@ -15,11 +15,7 @@ def _collection():
 def record_event(event_type: str, payload: dict[str, Any]):
     timestamp = datetime.now(timezone.utc).isoformat()
     event_id = f"event-{timestamp}-{uuid4().hex}"
-    _collection().add(
-        ids=[event_id],
-        documents=[repr(payload)],
-        metadatas=[{"event_type": event_type, "timestamp": timestamp}],
-    )
+    _collection().add(ids=[event_id], documents=[repr(payload)], metadatas=[{"event_type": event_type, "timestamp": timestamp}])
     return event_id
 
 
@@ -28,11 +24,4 @@ def list_events(limit: int = 50):
     if collection.count() == 0:
         return []
     result = collection.get(limit=min(limit, collection.count()), include=["documents", "metadatas"])
-    return [
-        {
-            "event": result["metadatas"][i].get("event_type", "unknown"),
-            "timestamp": result["metadatas"][i].get("timestamp", ""),
-            "details": result["documents"][i],
-        }
-        for i in range(len(result["documents"]))
-    ]
+    return [{"event": result["metadatas"][i].get("event_type", "unknown"), "timestamp": result["metadatas"][i].get("timestamp", ""), "details": result["documents"][i]} for i in range(len(result["documents"]))]
