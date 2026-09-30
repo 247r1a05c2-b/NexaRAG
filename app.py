@@ -12,12 +12,12 @@ from src.rag_pipeline import (
     delete_document,
     heal_knowledge_health,
     list_documents,
-    restore_knowledge_chunk,
     run_document_task,
     scan_knowledge_health,
     stats,
 )
 from src.evaluation import answer_quality_label
+from src.security import require_login
 
 load_dotenv()
 st.set_page_config(page_title="NexaRAG Self-Healing KB", page_icon="🧠", layout="wide")
@@ -33,6 +33,9 @@ def get_setting(name):
         return None
 
 
+if not require_login():
+    st.stop()
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "indexed" not in st.session_state:
@@ -47,11 +50,7 @@ st.caption("Detect → Verify → Heal → Retrieve → Audit")
 
 with st.sidebar:
     st.header("📚 Knowledge Ingestion")
-    uploaded_files = st.file_uploader(
-        "Upload PDF, DOCX, PPTX or TXT",
-        type=["pdf", "docx", "pptx", "txt", "png", "jpg", "jpeg"],
-        accept_multiple_files=True,
-    )
+    uploaded_files = st.file_uploader("Upload PDF, DOCX, PPTX or TXT", type=["pdf", "docx", "pptx", "txt", "png", "jpg", "jpeg"], accept_multiple_files=True)
     auto_scan = st.checkbox("Run integrity scan after ingestion", value=True)
 
     if st.button("🚀 Add to Knowledge Base", type="primary", use_container_width=True):
@@ -87,11 +86,7 @@ with st.sidebar:
     if report:
         score = report.get("health_score", 0)
         st.metric("Knowledge Health", f"{score}/100")
-        st.caption(
-            f"Checked {report.get('checked_chunks', 0)} active chunks • "
-            f"{report.get('auto_healable', 0)} auto-healable • "
-            f"{report.get('human_review', 0)} human-review"
-        )
+        st.caption(f"Checked {report.get('checked_chunks', 0)} active chunks • {report.get('auto_healable', 0)} auto-healable • {report.get('human_review', 0)} human-review")
         if report.get("status") == "healthy":
             st.success("No integrity issues detected.")
         else:
@@ -102,26 +97,20 @@ with st.sidebar:
             label = issue.get("type", "integrity").replace("_", " ").title()
             with st.expander(f"Issue {number + 1}: {label}"):
                 st.write(issue.get("reason", "No explanation provided."))
-                st.caption(
-                    f"Confidence: {issue.get('confidence', 0):.0%} • "
-                    f"Action: {issue.get('repair', 'review')} • "
-                    f"Chunks: {', '.join(issue.get('chunk_ids', []))}"
-                )
+                st.caption(f"Confidence: {issue.get('confidence', 0):.0%} • Action: {issue.get('repair', 'review')} • Chunks: {', '.join(issue.get('chunk_ids', []))}")
                 if issue.get("repair") == "review":
                     review_indexes.append(number)
 
-        if report.get("issues"):
-            if st.button("🛠️ Apply Safe Repairs", type="primary", use_container_width=True):
-                with st.spinner("Applying only high-confidence repairs..."):
-                    try:
-                        result = heal_knowledge_health(report)
-                        st.session_state.health_report = scan_knowledge_health()
-                        st.success(f"Repaired {result['repaired_count']} chunk(s). Evidence was quarantined, not deleted.")
-                    except Exception as exc:
-                        st.error(str(exc))
+        if report.get("issues") and st.button("🛠️ Apply Safe Repairs", type="primary", use_container_width=True):
+            with st.spinner("Applying only high-confidence repairs..."):
+                try:
+                    result = heal_knowledge_health(report)
+                    st.session_state.health_report = scan_knowledge_health()
+                    st.success(f"Repaired {result['repaired_count']} chunk(s). Evidence was quarantined, not deleted.")
+                except Exception as exc:
+                    st.error(str(exc))
 
         for index in review_indexes:
-            issue = report["issues"][index]
             if st.button(f"Approve repair for Issue {index + 1}", key=f"approve_{index}"):
                 try:
                     result = heal_knowledge_health(report, approved_issue_indexes=[index])
@@ -209,10 +198,7 @@ if mode == "Chat with Documents":
                     st.caption(f"{answer_quality_label(retrieval)} • Coverage: {retrieval['coverage']}")
                     with st.expander("📖 Sources, provenance & retrieval"):
                         for item in results:
-                            st.write(
-                                f"{item['source']} — page {item['page']} — version {item.get('version', '1')} — "
-                                f"semantic {item['score']} — hybrid {item.get('hybrid_score', item['score'])}"
-                            )
+                            st.write(f"{item['source']} — page {item['page']} — version {item.get('version', '1')} — semantic {item['score']} — hybrid {item.get('hybrid_score', item['score'])}")
                     st.session_state.messages.append({"role": "assistant", "content": answer})
                     c1, c2 = st.columns(2)
                     with c1:
@@ -233,7 +219,7 @@ else:
     st.info(task_map[mode])
     if st.button(f"Run {mode}", type="primary"):
         if not st.session_state.indexed:
-            st.error("Add documents first.")
+            st.error("The knowledge base is empty. Add documents first.")
         else:
             with st.spinner("Analyzing active knowledge..."):
                 try:
