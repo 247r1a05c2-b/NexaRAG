@@ -3,28 +3,25 @@ import types
 
 
 def _install_stubs():
-    if "chromadb" not in sys.modules:
-        chromadb = types.ModuleType("chromadb")
-        chromadb.PersistentClient = lambda *args, **kwargs: None
-        sys.modules["chromadb"] = chromadb
+    chromadb = types.ModuleType("chromadb")
+    chromadb.PersistentClient = lambda *args, **kwargs: None
+    sys.modules["chromadb"] = chromadb
 
-    if "streamlit" not in sys.modules:
-        streamlit = types.ModuleType("streamlit")
-        streamlit.secrets = {}
-        sys.modules["streamlit"] = streamlit
+    streamlit = types.ModuleType("streamlit")
+    streamlit.secrets = {}
+    streamlit.session_state = {}
+    sys.modules["streamlit"] = streamlit
 
-    if "google" not in sys.modules:
-        google = types.ModuleType("google")
-        genai = types.ModuleType("google.genai")
-        genai.Client = lambda *args, **kwargs: None
-        google.genai = genai
-        sys.modules["google"] = google
-        sys.modules["google.genai"] = genai
+    google = types.ModuleType("google")
+    genai = types.ModuleType("google.genai")
+    genai.Client = lambda *args, **kwargs: None
+    google.genai = genai
+    sys.modules["google"] = google
+    sys.modules["google.genai"] = genai
 
-    if "sentence_transformers" not in sys.modules:
-        st = types.ModuleType("sentence_transformers")
-        st.SentenceTransformer = lambda *args, **kwargs: None
-        sys.modules["sentence_transformers"] = st
+    sentence_transformers = types.ModuleType("sentence_transformers")
+    sentence_transformers.SentenceTransformer = lambda *args, **kwargs: None
+    sys.modules["sentence_transformers"] = sentence_transformers
 
 
 _install_stubs()
