@@ -1,0 +1,30 @@
+services:
+  nexarag:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      APP_ACCESS_PASSWORD: ${APP_ACCESS_PASSWORD:-}
+    volumes:
+      - nexarag_data:/app/data
+      - ./knowledge_inbox:/app/knowledge_inbox
+    restart: unless-stopped
+
+  ingestion-worker:
+    build: .
+    command: ["python", "scripts/continuous_ingest.py"]
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      KNOWLEDGE_INBOX: /app/knowledge_inbox
+      INGEST_INTERVAL_SECONDS: ${INGEST_INTERVAL_SECONDS:-60}
+      AUDIT_INTERVAL_SECONDS: ${AUDIT_INTERVAL_SECONDS:-300}
+    volumes:
+      - nexarag_data:/app/data
+      - ./knowledge_inbox:/app/knowledge_inbox
+    restart: unless-stopped
+
+volumes:
+  nexarag_data:
