@@ -2,11 +2,12 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from src.document_loader import load_uploaded_file
-from src.rag_pipeline import answer_question, build_index, clear_index, delete_document, list_documents, run_document_task, stats
+from src.rag_pipeline import answer_question, build_index, clear_index, delete_document, list_documents, run_document_task, stats, scan_knowledge_health, heal_knowledge_health
 from src.evaluation import answer_quality_label
 
 load_dotenv()
 st.set_page_config(page_title="NexaRAG", page_icon="🧠", layout="wide")
+
 
 def get_setting(name):
     value = os.getenv(name)
@@ -17,15 +18,18 @@ def get_setting(name):
     except Exception:
         return None
 
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "indexed" not in st.session_state:
     st.session_state.indexed = stats()["chunks"] > 0
 if "feedback" not in st.session_state:
     st.session_state.feedback = []
+if "health_report" not in st.session_state:
+    st.session_state.health_report = None
 
 st.title("🧠 NexaRAG")
-st.caption("Adaptive RAG knowledge platform for hackathons, research and domain assistants.")
+st.caption("Self-healing RAG knowledge platform for hackathons, research and domain assistants.")
 
 with st.sidebar:
     st.header("📚 Knowledge Base")
@@ -47,21 +51,67 @@ with st.sidebar:
                     count = build_index(documents)
                 st.session_state.indexed = stats()["chunks"] > 0
                 st.session_state.messages = []
+                st.session_state.health_report = None
                 st.success(f"Added {count} new chunks. Existing knowledge was preserved.")
             except Exception as exc:
                 st.error(str(exc))
+
+    st.divider()
+    st.header("🩺 Self-Healing Knowledge")
+    st.caption("The Knowledge Integrity Agent checks for contradictions, duplicates and weak evidence before retrieval is affected.")
+
+    if st.button("🔍 Scan Knowledge Health", use_container_width=True):
+        if not st.session_state.indexed:
+            st.error("Add documents first.")
+        else:
+            with st.spinner("Knowledge Integrity Agent is checking the knowledge base..."):
+                try:
+                    st.session_state.health_report = scan_knowledge_health(limit=60)
+                except Exception as exc:
+                    st.error(str(exc))
+
+    report = st.session_state.health_report
+    if report:
+        score = report.get("health_score", 0)
+        status = report.get("status", "unknown")
+        st.metric("Knowledge Health", f"{score}/100")
+        if status == "healthy":
+            st.success(f"Healthy • {report.get('checked_chunks', 0)} chunks checked")
+        else:
+            st.warning(f"Repair recommended • {len(report.get('issues', []))} integrity issue(s)")
+
+        if report.get("issues"):
+            for number, issue in enumerate(report["issues"], 1):
+                with st.expander(f"Issue {number}: {issue.get('type', 'integrity').replace('_', ' ').title()}"):
+                    st.write(issue.get("reason", "No explanation provided."))
+                    st.caption(f"Confidence: {issue.get('confidence', 0):.0%}")
+                    st.caption(f"Repair action: {issue.get('repair', 'review')}")
+
+            if st.button("🛠️ Heal Knowledge Base", type="primary", use_container_width=True):
+                with st.spinner("Applying safe repairs and quarantining superseded evidence..."):
+                    try:
+                        result = heal_knowledge_health(report)
+                        st.session_state.health_report = scan_knowledge_health(limit=60)
+                        if result["repaired_count"]:
+                            st.success(f"Healed {result['repaired_count']} chunk(s). Superseded evidence is preserved in quarantine and removed from normal retrieval.")
+                        else:
+                            st.info("No automatic repair was safe enough to apply. Issues remain available for review.")
+                    except Exception as exc:
+                        st.error(str(exc))
 
     st.divider()
     st.header("🗂️ Documents")
     docs = list_documents()
     if docs:
         for doc in docs:
+            quarantine_note = f" • {doc['quarantined']} quarantined" if doc.get("quarantined") else ""
             st.write(f"**{doc['source']}**")
-            st.caption(f"{doc['chunks']} chunks • {doc['pages']} pages • {doc['methods']}")
+            st.caption(f"{doc['chunks']} chunks • {doc['pages']} pages • {doc['methods']}{quarantine_note}")
             if st.button("Remove", key=f"remove_{doc['source']}"):
                 delete_document(doc["source"])
                 st.session_state.indexed = stats()["chunks"] > 0
                 st.session_state.messages = []
+                st.session_state.health_report = None
                 st.rerun()
     else:
         st.caption("No documents indexed yet.")
@@ -70,6 +120,7 @@ with st.sidebar:
         clear_index()
         st.session_state.indexed = False
         st.session_state.messages = []
+        st.session_state.health_report = None
         st.rerun()
 
     st.divider()
@@ -101,8 +152,10 @@ with st.sidebar:
 
     metrics = stats()
     st.metric("Documents", metrics["documents"])
-    st.metric("Indexed chunks", metrics["chunks"])
+    st.metric("Active chunks", metrics["chunks"])
+    st.metric("Quarantined chunks", metrics.get("quarantined", 0))
     st.metric("Session feedback", len(st.session_state.feedback))
+
 
 domain_prompts = {
     "Universal": "Answer using the supplied documents.",
@@ -172,4 +225,4 @@ else:
                     st.error(str(exc))
 
 st.divider()
-st.caption("NexaRAG • RAG • Hybrid Retrieval • Gemini • Chroma • Sentence Transformers • OCR")
+st.caption("NexaRAG • Self-Healing Knowledge • RAG • Hybrid Retrieval • Gemini • Chroma • Sentence Transformers • OCR")
