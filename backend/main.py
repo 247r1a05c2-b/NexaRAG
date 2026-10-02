@@ -4,16 +4,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from pydantic import BaseModel, Field
 from .agents import IncidentCommander
 from .llm_agent import generate_incident_summary
 from .models import EventIn, IncidentCreate
+from .query import answer_question
 from .store import add_event, create_incident, get_incident, list_incidents, replace_incident
 
 BASE = Path(__file__).resolve().parent.parent
-app = FastAPI(title="NexaRAG Multi-Agent Incident Commander", version="2.0.0")
+app = FastAPI(title="NexaRAG Multi-Agent Incident Commander", version="2.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory=BASE / "frontend"), name="static")
 commander = IncidentCommander()
+
+class QueryIn(BaseModel):
+    question: str = Field(min_length=1, max_length=10000)
+    context: str = Field(default="", max_length=100000)
 
 @app.get("/", include_in_schema=False)
 def root():
@@ -21,7 +27,11 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "multi-agent-incident-commander", "version": app.version}
+    return {"status": "ok", "service": "nexarag", "version": app.version}
+
+@app.post("/api/query")
+def query(data: QueryIn):
+    return answer_question(data.question, data.context)
 
 @app.get("/api/incidents")
 def incidents():
