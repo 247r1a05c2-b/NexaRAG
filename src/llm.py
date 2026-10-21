@@ -30,8 +30,9 @@ def generate_text(prompt):
         raise RuntimeError("GEMINI_API_KEY is missing from Streamlit Secrets.")
 
     client = genai.Client(api_key=api_key)
-    primary = get_setting("GEMINI_MODEL", "gemini-3.8-flash")
-    models = list(dict.fromkeys([primary, "gemini-2.5-flash-lite", "gemini-3.8-flash"]))
+    # Keep the default aligned with the documented, supported model name.
+    primary = get_setting("GEMINI_MODEL", "gemini-2.5-flash")
+    models = list(dict.fromkeys([primary, "gemini-2.5-flash-lite"]))
     last_error = None
 
     for model in models:
